@@ -86,8 +86,9 @@ def embed_in_dwt_bands(payload_bits: str, bands: Dict[str, np.ndarray]) -> Dict[
         else:
             modified_bands[band_name] = band_data
     
-    # Use quantization based on coefficient magnitude
-    Q = 2.0  # Fixed quantization step for all coefficients
+    # Increased quantization step for better robustness
+    # Q=4.0 provides 2x margin over Q=2.0, trades PSNR for reliability
+    Q = 4.0  # Larger step = more robust embedding (targets <1% BER)
     
     for i, bit in enumerate(payload_bits):
         band_name, row, col = all_coefficients[i]
@@ -171,9 +172,9 @@ def extract_from_dwt_bands(bands: Dict[str, np.ndarray], payload_bit_length: int
     
     print(f"Extracting from {payload_bit_length} coefficients (rows,cols >= 16)")
     
-    # Extract using fixed quantization matching embedding
+    # Extract using same increased quantization as embedding
     extracted_bits = []
-    Q = 2.0  # Same fixed Q as embedding
+    Q = 4.0  # Must match embedding Q for correct extraction
     
     for i in range(payload_bit_length):
         band_name, row, col = all_coefficients[i]

@@ -201,9 +201,9 @@ def decompress_huffman(compressed_data: bytes, tree_bytes: bytes) -> bytes:
 
 
 # Reed-Solomon Error Correction for tree data
-# Can correct up to nsym/2 byte errors
-# Using 20 error correction symbols → can fix up to 10 byte errors
-RS_CODEC = RSCodec(20)
+# Increased to 50 error correction symbols → can fix up to 25 byte errors
+# This handles ~10% error rate which is conservative for DWT embedding
+RS_CODEC = RSCodec(50)
 
 
 def create_payload(message_bytes: bytes, tree_bytes: bytes, compressed: bytes) -> bytes:
