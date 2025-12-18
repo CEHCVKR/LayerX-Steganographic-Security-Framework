@@ -1,0 +1,12 @@
+======================================================================
+PSNR OPTIMIZATION - Q FACTOR vs PAYLOAD SIZE
+======================================================================
+Traceback (most recent call last):
+  File "H:\LayerX Steganographic Security Framework\test_q_factor_analysis.py", line 320, in <module>
+    main()
+  File "H:\LayerX Steganographic Security Framework\test_q_factor_analysis.py", line 189, in main
+    print("Goal: Maintain PSNR \u226550 dB with different configurations\n")
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\Lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode character '\u2265' in position 20: character maps to <undefined>

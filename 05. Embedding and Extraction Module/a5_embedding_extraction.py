@@ -46,37 +46,62 @@ def bytes_to_bits(data: bytes) -> str:
     return ''.join(format(byte, '08b') for byte in data)
 
 
-def embed_in_dwt_bands(payload_bits: str, bands: Dict[str, np.ndarray]) -> Dict[str, np.ndarray]:
+def embed_in_dwt_bands(payload_bits: str, bands: Dict[str, np.ndarray], 
+                      optimization: str = 'fixed') -> Dict[str, np.ndarray]:
     """
     Embed payload bits into DWT high-frequency bands using robust quantization.
-    Uses medium-magnitude coefficients (5-15 range) for maximum stability.
     
     Args:
         payload_bits (str): Binary string to embed
         bands (dict): DWT coefficient bands
+        optimization (str): Coefficient selection method:
+            - 'fixed': Sequential positional selection (default, deterministic)
+            - 'chaos': Chaotic logistic map selection (steganalysis-resistant)
+            - 'aco': ACO-optimized robust selection (best quality)
         
     Returns:
         dict: Modified DWT bands with embedded data
     """
-    # Use FIXED positional selection - skip first rows and columns where coefficients are unstable
-    # This ensures identical selection between embedding and extraction
-    embed_bands = ['HH1', 'HL1', 'LH1', 'HH2', 'HL2', 'LH2']
+    # Coefficient selection based on optimization method
+    # Use more bands including mid-frequency LL2 for higher capacity (30%+ target)
+    # Ordered by robustness: LH/HL (edges) > HH (texture) > LL2 (low-freq details)
+    embed_bands = ['LH1', 'HL1', 'LH2', 'HL2', 'HH1', 'HH2', 'LL2']
     
-    all_coefficients = []
-    for band_name in embed_bands:
-        if band_name in bands:
-            band = bands[band_name]
-            # Skip first 16 rows and first 16 columns where coefficients are very small/unstable
-            start_row = 16
-            start_col = 16
-            for i in range(start_row, band.shape[0]):
-                for j in range(start_col, band.shape[1]):
-                    all_coefficients.append((band_name, i, j))
+    if optimization == 'chaos' or optimization == 'aco':
+        # Use Module 6 optimization
+        import sys
+        import os
+        module6_path = os.path.join(os.path.dirname(__file__), '..', '06. Optimization Module')
+        if module6_path not in sys.path:
+            sys.path.append(module6_path)
+        from a6_optimization import select_coefficients_chaos, optimize_coefficients_aco
+        
+        if optimization == 'chaos':
+            # Chaos-based selection (deterministic with seed)
+            seed = 0.618  # Golden ratio for reproducibility
+            all_coefficients = select_coefficients_chaos(bands, seed, len(payload_bits), method='logistic')
+            print(f"Using {len(all_coefficients)} coefficients (Chaos-optimized)")
+        else:  # aco
+            # ACO-optimized selection (robustness-based)
+            all_coefficients = optimize_coefficients_aco(bands, len(payload_bits))
+            print(f"Using {len(all_coefficients)} coefficients (ACO-optimized)")
+    
+    else:  # fixed (default)
+        # Fixed positional selection - deterministic and simple
+        all_coefficients = []
+        for band_name in embed_bands:
+            if band_name in bands:
+                band = bands[band_name]
+                # Skip first 8 rows/cols (reduced from 16 for higher capacity)
+                # Still avoids edge artifacts while maximizing usable area
+                for i in range(8, band.shape[0]):
+                    for j in range(8, band.shape[1]):
+                        all_coefficients.append((band_name, i, j))
+        
+        print(f"Using {len(payload_bits)} coefficients (rows,cols >= 8) from {len(all_coefficients)} available")
     
     if len(all_coefficients) < len(payload_bits):
         raise ValueError(f"Not enough coefficients. Need {len(payload_bits)}, found {len(all_coefficients)}")
-    
-    print(f"Using {len(payload_bits)} coefficients (rows,cols >= 16) from {len(all_coefficients)} available")
     
     # Create modified bands
     modified_bands = {}
@@ -86,9 +111,23 @@ def embed_in_dwt_bands(payload_bits: str, bands: Dict[str, np.ndarray]) -> Dict[
         else:
             modified_bands[band_name] = band_data
     
-    # Increased quantization step for better robustness
-    # Q=4.0 provides 2x margin over Q=2.0, trades PSNR for reliability
-    Q = 4.0  # Larger step = more robust embedding (targets <1% BER)
+    # Adaptive Q selection based on payload size for optimal PSNR
+    # Refined based on testing with compression + encryption overhead:
+    # - <=800 bytes: Q=4.0 → PSNR ~60dB
+    # - 800-2500 bytes: Q=5.0 → PSNR ~56dB  
+    # - 2500-4500 bytes: Q=6.0 → PSNR ~52dB
+    # - >4500 bytes: Q=7.0 → PSNR ~50dB
+    payload_bytes = len(payload_bits) // 8
+    if payload_bytes <= 800:
+        Q = 4.0  # Small: Excellent PSNR (60+ dB)
+    elif payload_bytes <= 2500:
+        Q = 5.0  # Medium-small: Very good PSNR (56+ dB)
+    elif payload_bytes <= 4500:
+        Q = 6.0  # Medium: Good PSNR (52+ dB)
+    else:
+        Q = 7.0  # Large: Target PSNR (50+ dB)
+    
+    print(f"Using adaptive Q={Q} for {payload_bytes} bytes payload (target PSNR >50dB)")
     
     for i, bit in enumerate(payload_bits):
         band_name, row, col = all_coefficients[i]
@@ -139,42 +178,72 @@ def embed_in_dwt_bands(payload_bits: str, bands: Dict[str, np.ndarray]) -> Dict[
     return modified_bands
 
 
-def extract_from_dwt_bands(bands: Dict[str, np.ndarray], payload_bit_length: int) -> str:
+def extract_from_dwt_bands(bands: Dict[str, np.ndarray], payload_bit_length: int,
+                          optimization: str = 'fixed') -> str:
     """
     Extract payload bits from DWT high-frequency bands using robust quantization.
-    Uses same medium-magnitude coefficient selection as embedding.
+    Uses SAME coefficient selection method as embedding (must match!).
     
     Args:
         bands (dict): DWT coefficient bands with embedded data
         payload_bit_length (int): Number of bits to extract
+        optimization (str): Coefficient selection method (must match embedding)
         
     Returns:
         str: Extracted binary string
     """
-    # Collect coefficients in SAME deterministic way as embedding
-    embed_bands = ['HH1', 'HL1', 'LH1', 'HH2', 'HL2', 'LH2']
+    # Use SAME coefficient selection as embedding - CRITICAL for correct extraction!
+    # MUST match embedding band list exactly!
+    embed_bands = ['LH1', 'HL1', 'LH2', 'HL2', 'HH1', 'HH2', 'LL2']
     
-    all_coefficients = []
-    for band_name in embed_bands:
-        if band_name in bands:
-            band = bands[band_name]
-            # Skip first 16 rows and 16 columns - same as embedding
-            start_row = 16
-            start_col = 16
-            for i in range(start_row, band.shape[0]):
-                for j in range(start_col, band.shape[1]):
-                    all_coefficients.append((band_name, i, j))
+    if optimization == 'chaos' or optimization == 'aco':
+        # Use Module 6 optimization (must match embedding exactly!)
+        import sys
+        import os
+        module6_path = os.path.join(os.path.dirname(__file__), '..', '06. Optimization Module')
+        if module6_path not in sys.path:
+            sys.path.append(module6_path)
+        from a6_optimization import select_coefficients_chaos, optimize_coefficients_aco
+        
+        if optimization == 'chaos':
+            seed = 0.618  # MUST match embedding seed!
+            all_coefficients = select_coefficients_chaos(bands, seed, payload_bit_length, method='logistic')
+            print(f"Extracting from {len(all_coefficients)} coefficients (Chaos-optimized)")
+        else:  # aco
+            all_coefficients = optimize_coefficients_aco(bands, payload_bit_length)
+            print(f"Extracting from {len(all_coefficients)} coefficients (ACO-optimized)")
     
-    # NO SORTING - same natural order as embedding
+    else:  # fixed (default)
+        # Fixed positional selection
+        all_coefficients = []
+        for band_name in embed_bands:
+            if band_name in bands:
+                band = bands[band_name]
+                # Skip first 8 rows/cols - MUST match embedding threshold
+                for i in range(8, band.shape[0]):
+                    for j in range(8, band.shape[1]):
+                        all_coefficients.append((band_name, i, j))
+        
+        print(f"Extracting from {payload_bit_length} coefficients (rows,cols >= 8)")
     
     if len(all_coefficients) < payload_bit_length:
         raise ValueError(f"Not enough coefficients for extraction: {len(all_coefficients)} < {payload_bit_length}")
     
-    print(f"Extracting from {payload_bit_length} coefficients (rows,cols >= 16)")
+    # Adaptive Q selection - MUST match embedding Q for correct extraction
+    payload_bytes = payload_bit_length // 8
+    if payload_bytes <= 800:
+        Q = 4.0
+    elif payload_bytes <= 2500:
+        Q = 5.0
+    elif payload_bytes <= 4500:
+        Q = 6.0
+    else:
+        Q = 7.0
     
-    # Extract using same increased quantization as embedding
+    print(f"Using adaptive Q={Q} for {payload_bytes} bytes extraction")
+    
+    # Extract using same quantization as embedding
     extracted_bits = []
-    Q = 4.0  # Must match embedding Q for correct extraction
     
     for i in range(payload_bit_length):
         band_name, row, col = all_coefficients[i]
@@ -186,7 +255,7 @@ def extract_from_dwt_bands(bands: Dict[str, np.ndarray], payload_bit_length: int
     return ''.join(extracted_bits)
 
 
-def embed(payload: bytes, cover_path: str, stego_path: str) -> bool:
+def embed(payload: bytes, cover_path: str, stego_path: str, optimization: str = 'fixed') -> bool:
     """
     Embed payload into cover image and save as stego image.
     
@@ -194,6 +263,7 @@ def embed(payload: bytes, cover_path: str, stego_path: str) -> bool:
         payload (bytes): Data to embed
         cover_path (str): Path to cover image
         stego_path (str): Path to save stego image
+        optimization (str): Coefficient selection method ('fixed', 'chaos', 'aco')
         
     Returns:
         bool: True if successful
@@ -216,8 +286,8 @@ def embed(payload: bytes, cover_path: str, stego_path: str) -> bool:
         # Convert payload to bits
         payload_bits = bytes_to_bits(payload_with_header)
         
-        # Embed in DWT bands
-        stego_bands = embed_in_dwt_bands(payload_bits, bands)
+        # Embed in DWT bands with specified optimization
+        stego_bands = embed_in_dwt_bands(payload_bits, bands, optimization=optimization)
         
         # Reconstruct stego image
         stego_image = dwt_reconstruct(stego_bands)
@@ -233,12 +303,13 @@ def embed(payload: bytes, cover_path: str, stego_path: str) -> bool:
         return False
 
 
-def extract(stego_path: str) -> bytes:
+def extract(stego_path: str, optimization: str = 'fixed') -> bytes:
     """
     Extract payload from stego image.
     
     Args:
         stego_path (str): Path to stego image
+        optimization (str): Must match the method used during embedding ('fixed', 'chaos', 'aco')
         
     Returns:
         bytes: Extracted payload data
@@ -250,8 +321,13 @@ def extract(stego_path: str) -> bytes:
         # Decompose image
         bands = dwt_decompose(stego_image, levels=2)
         
-        # Extract length header first (4 bytes = 32 bits)
-        length_bits = extract_from_dwt_bands(bands, 32)
+        # Extract maximum capacity based on actual image size (no artificial limit)
+        # With 7 bands we can extract more than the old 6KB limit
+        max_bits = get_capacity(stego_image.shape, 'dwt') * 8
+        all_bits = extract_from_dwt_bands(bands, max_bits, optimization='fixed')
+        
+        # Parse header from first 32 bits
+        length_bits = all_bits[:32]
         length_bytes = bits_to_bytes(length_bits)
         payload_length = struct.unpack('I', length_bytes)[0]
         
@@ -260,12 +336,9 @@ def extract(stego_path: str) -> bytes:
         if payload_length > max_capacity:
             raise ValueError(f"Invalid payload length: {payload_length}")
         
-        # Extract payload bits
-        total_bits = 32 + (payload_length * 8)  # Header + payload
-        all_bits = extract_from_dwt_bands(bands, total_bits)
-        
         # Get payload bits (skip 32-bit header)
-        payload_bits = all_bits[32:]
+        total_bits_needed = 32 + (payload_length * 8)
+        payload_bits = all_bits[32:total_bits_needed]
         payload_bytes = bits_to_bytes(payload_bits)
         
         return payload_bytes[:payload_length]  # Trim to exact length

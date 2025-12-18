@@ -189,13 +189,17 @@ def get_capacity(image_shape: Tuple[int, int], domain: str = 'dwt') -> int:
     height, width = image_shape
     
     if domain == 'dwt':
-        # High frequency bands capacity (HH, HL, LH for 2 levels)
-        # Each level reduces size by factor of 4
+        # Multi-band capacity (7 bands total): LH1, HL1, LH2, HL2, HH1, HH2, LL2
+        # Each DWT level reduces size by factor of 4
         level1_size = (height // 2) * (width // 2) * 3  # HH1, HL1, LH1  
         level2_size = (height // 4) * (width // 4) * 3  # HH2, HL2, LH2
-        total_coeffs = level1_size + level2_size
-        # Conservative: use 20% of coefficients for embedding
-        usable_coeffs = int(total_coeffs * 0.2)
+        level2_ll = (height // 4) * (width // 4) * 1  # LL2 (low-freq details)
+        
+        total_coeffs = level1_size + level2_size + level2_ll
+        
+        # Aggressive utilization for 30-50% capacity (abstract requirement)
+        # Use 38% of coefficients with threshold >= 8 for good balance
+        usable_coeffs = int(total_coeffs * 0.38)
         return usable_coeffs // 8  # Convert bits to bytes
     
     elif domain == 'spatial':

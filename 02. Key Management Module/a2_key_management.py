@@ -1,12 +1,15 @@
 """
 Module 2: Key Management
 Author: Member A
-Description: AES key derivation and steganography key generation/storage
-Dependencies: secrets, json
+Description: AES key derivation, ECC key management, and steganography key generation
+Dependencies: secrets, json, cryptography
 
 Functions:
 - derive_aes_key(password: str, salt: bytes) → bytes (32-byte AES-256 key)
 - generate_stego_key() → bytes (32 random bytes for steganography)
+- generate_ecc_keypair() → (private_key, public_key) (SECP256R1 ECC keys)
+- encrypt_aes_key_with_ecc(aes_key: bytes, public_key) → bytes
+- decrypt_aes_key_with_ecc(encrypted_key: bytes, private_key) → bytes
 - KeyManager class for in-memory key storage and encrypted file persistence
 """
 
@@ -15,10 +18,21 @@ import json
 import secrets
 from Crypto.Protocol.KDF import PBKDF2
 from Crypto.Hash import SHA256
-from typing import Dict, Optional
+from typing import Dict, Optional, Tuple
 import sys
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import os
+# Add parent and sibling directories to path
+parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, parent_dir)
+sys.path.insert(0, os.path.join(parent_dir, "01. Encryption Module"))
 from a1_encryption import encrypt_message, decrypt_message
+
+# ECC imports
+from cryptography.hazmat.primitives.asymmetric import ec
+from cryptography.hazmat.primitives import serialization, hashes
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 
 
 def derive_aes_key(password: str, salt: bytes) -> bytes:
@@ -48,6 +62,172 @@ def generate_stego_key() -> bytes:
     Returns:
         bytes: 32 random bytes for steganography operations
     """
+    return secrets.token_bytes(32)
+
+
+def generate_ecc_keypair() -> Tuple:
+    """
+    Generate ECC key pair using SECP256R1 (P-256) curve.
+    
+    Returns:
+        tuple: (private_key, public_key) objects
+    """
+    private_key = ec.generate_private_key(ec.SECP256R1(), default_backend())
+    public_key = private_key.public_key()
+    return private_key, public_key
+
+
+def serialize_public_key(public_key) -> bytes:
+    """
+    Serialize ECC public key to PEM format.
+    
+    Args:
+        public_key: ECC public key object
+        
+    Returns:
+        bytes: PEM-encoded public key
+    """
+    return public_key.public_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo
+    )
+
+
+def deserialize_public_key(pem_data: bytes):
+    """
+    Deserialize ECC public key from PEM format.
+    
+    Args:
+        pem_data: PEM-encoded public key bytes
+        
+    Returns:
+        ECC public key object
+    """
+    return serialization.load_pem_public_key(pem_data, backend=default_backend())
+
+
+def serialize_private_key(private_key, password: Optional[str] = None) -> bytes:
+    """
+    Serialize ECC private key to PEM format with optional encryption.
+    
+    Args:
+        private_key: ECC private key object
+        password: Optional password for encryption
+        
+    Returns:
+        bytes: PEM-encoded private key
+    """
+    if password:
+        encryption = serialization.BestAvailableEncryption(password.encode('utf-8'))
+    else:
+        encryption = serialization.NoEncryption()
+    
+    return private_key.private_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PrivateFormat.PKCS8,
+        encryption_algorithm=encryption
+    )
+
+
+def deserialize_private_key(pem_data: bytes, password: Optional[str] = None):
+    """
+    Deserialize ECC private key from PEM format.
+    
+    Args:
+        pem_data: PEM-encoded private key bytes
+        password: Optional password if key is encrypted
+        
+    Returns:
+        ECC private key object
+    """
+    pwd = password.encode('utf-8') if password else None
+    return serialization.load_pem_private_key(pem_data, password=pwd, backend=default_backend())
+
+
+def encrypt_aes_key_with_ecc(aes_key: bytes, public_key) -> bytes:
+    """
+    Encrypt AES session key using ECC public key (ECIES-like scheme).
+    Uses ECDH + KDF + AES-GCM for encryption.
+    
+    Args:
+        aes_key: 32-byte AES-256 key to encrypt
+        public_key: Receiver's ECC public key
+        
+    Returns:
+        bytes: Encrypted AES key (ephemeral_public_key || nonce || ciphertext || tag)
+    """
+    # Generate ephemeral key pair
+    ephemeral_private = ec.generate_private_key(ec.SECP256R1(), default_backend())
+    ephemeral_public = ephemeral_private.public_key()
+    
+    # Perform ECDH to get shared secret
+    shared_secret = ephemeral_private.exchange(ec.ECDH(), public_key)
+    
+    # Derive encryption key from shared secret using HKDF
+    derived_key = HKDF(
+        algorithm=hashes.SHA256(),
+        length=32,
+        salt=None,
+        info=b'ECC-AES-Hybrid',
+        backend=default_backend()
+    ).derive(shared_secret)
+    
+    # Encrypt AES key with derived key using AES-GCM
+    nonce = os.urandom(12)  # 96-bit nonce for GCM
+    cipher = Cipher(algorithms.AES(derived_key), modes.GCM(nonce), backend=default_backend())
+    encryptor = cipher.encryptor()
+    ciphertext = encryptor.update(aes_key) + encryptor.finalize()
+    
+    # Serialize ephemeral public key
+    ephemeral_public_bytes = ephemeral_public.public_bytes(
+        encoding=serialization.Encoding.X962,
+        format=serialization.PublicFormat.UncompressedPoint
+    )
+    
+    # Return: ephemeral_public (65 bytes) || nonce (12 bytes) || ciphertext (32 bytes) || tag (16 bytes)
+    return ephemeral_public_bytes + nonce + ciphertext + encryptor.tag
+
+
+def decrypt_aes_key_with_ecc(encrypted_data: bytes, private_key) -> bytes:
+    """
+    Decrypt AES session key using ECC private key.
+    
+    Args:
+        encrypted_data: Encrypted AES key from encrypt_aes_key_with_ecc
+        private_key: Receiver's ECC private key
+        
+    Returns:
+        bytes: Decrypted 32-byte AES-256 key
+    """
+    # Parse encrypted data
+    ephemeral_public_bytes = encrypted_data[:65]  # Uncompressed point (65 bytes)
+    nonce = encrypted_data[65:77]  # 12 bytes
+    ciphertext = encrypted_data[77:109]  # 32 bytes
+    tag = encrypted_data[109:125]  # 16 bytes
+    
+    # Reconstruct ephemeral public key
+    ephemeral_public = ec.EllipticCurvePublicKey.from_encoded_point(
+        ec.SECP256R1(), ephemeral_public_bytes
+    )
+    
+    # Perform ECDH to get shared secret
+    shared_secret = private_key.exchange(ec.ECDH(), ephemeral_public)
+    
+    # Derive decryption key from shared secret
+    derived_key = HKDF(
+        algorithm=hashes.SHA256(),
+        length=32,
+        salt=None,
+        info=b'ECC-AES-Hybrid',
+        backend=default_backend()
+    ).derive(shared_secret)
+    
+    # Decrypt using AES-GCM
+    cipher = Cipher(algorithms.AES(derived_key), modes.GCM(nonce, tag), backend=default_backend())
+    decryptor = cipher.decryptor()
+    aes_key = decryptor.update(ciphertext) + decryptor.finalize()
+    
+    return aes_key
     return secrets.token_bytes(32)
 
 

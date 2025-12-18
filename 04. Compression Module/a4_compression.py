@@ -200,15 +200,29 @@ def decompress_huffman(compressed_data: bytes, tree_bytes: bytes) -> bytes:
     return bytes(decoded)
 
 
-# Reed-Solomon Error Correction for tree data
-# Increased to 50 error correction symbols → can fix up to 25 byte errors
-# This handles ~10% error rate which is conservative for DWT embedding
-RS_CODEC = RSCodec(50)
+# Reed-Solomon Error Correction with adaptive strength based on payload size
+def get_rs_codec(data_size: int) -> RSCodec:
+    """
+    Select appropriate RS codec based on data size.
+    Larger payloads need stronger error correction.
+    
+    Args:
+        data_size: Size of data to protect (bytes)
+        
+    Returns:
+        RSCodec: Appropriate codec for the data size
+    """
+    if data_size < 500:  # Small payload (<500 bytes)
+        return RSCodec(30)  # Can fix 15 byte errors
+    elif data_size < 2000:  # Medium payload (500-2000 bytes)
+        return RSCodec(60)  # Can fix 30 byte errors
+    else:  # Large payload (>2000 bytes)
+        return RSCodec(120)  # Can fix 60 byte errors
 
 
 def create_payload(message_bytes: bytes, tree_bytes: bytes, compressed: bytes) -> bytes:
     """
-    Create payload with Reed-Solomon error correction on tree data.
+    Create payload with adaptive Reed-Solomon error correction on tree data.
     Format: [msg_len:4bytes][tree_len_ecc:4bytes][tree_with_ecc][compressed]
     
     Args:
@@ -217,12 +231,15 @@ def create_payload(message_bytes: bytes, tree_bytes: bytes, compressed: bytes) -
         compressed (bytes): Compressed data
         
     Returns:
-        bytes: Complete payload with ECC protection for tree
+        bytes: Complete payload with adaptive ECC protection for tree
     """
     msg_len = len(message_bytes)
     
-    # Apply Reed-Solomon error correction to tree (can fix up to 10 byte errors)
-    tree_with_ecc = RS_CODEC.encode(tree_bytes)
+    # Select appropriate ECC codec based on tree size
+    rs_codec = get_rs_codec(len(tree_bytes))
+    
+    # Apply adaptive Reed-Solomon error correction to tree
+    tree_with_ecc = rs_codec.encode(tree_bytes)
     tree_ecc_len = len(tree_with_ecc)
     
     payload = struct.pack('I', msg_len)  # 4 bytes message length
@@ -260,11 +277,18 @@ def parse_payload(payload: bytes) -> Tuple[int, bytes, bytes]:
     
     tree_with_ecc = payload[tree_start:tree_end]
     
-    # Decode and error-correct the tree (fixes up to 10 byte errors)
-    try:
-        tree_bytes = RS_CODEC.decode(tree_with_ecc)[0]  # Returns (decoded_msg, decoded_msgecc)
-    except Exception as e:
-        raise ValueError(f"Tree ECC decoding failed: {e}")
+    # Try decoding with different ECC strengths (we don't know which was used)
+    # Try from strongest to weakest
+    for codec_strength in [120, 60, 30]:
+        try:
+            rs_codec = RSCodec(codec_strength)
+            tree_bytes = rs_codec.decode(tree_with_ecc)[0]
+            break  # Success!
+        except Exception:
+            continue  # Try next strength
+    else:
+        raise ValueError("Tree ECC decoding failed with all codec strengths")
+    
     compressed = payload[tree_end:]
     
     return msg_len, tree_bytes, compressed
