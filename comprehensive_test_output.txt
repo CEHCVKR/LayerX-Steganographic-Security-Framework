@@ -1,0 +1,43 @@
+================================================================================
+LayerX - Final Comprehensive Test Suite
+================================================================================
+
+Image: 512x512 Lena
+Maximum Capacity: 12451 bytes (12.2 KB)
+Capacity Ratio: 4.75% of image size
+
+================================================================================
+[Test 1] Small Message (5 bytes)
+================================================================================
+Original: 'Hello' (5 bytes)
+Encrypted: 16 bytes
+Compressed: 9 bytes (56.2%)
+Payload: b'\x10\x00\x00\x00\xeb\x03\x00\x00\x80\x04\x95\xf0\x02\x00\x00\x00\x00\x00\x00\x8c\x0ea4_compression\x94\x8c\x0bHuffmanNode\x94\x93\x94)\x81\x94}\x94(\x8c\x04char\x94N\x8c\x04freq\x94K\x10\x8c\x04left\x94h\x02)\x81\x94}\x94(h\x05Nh\x06K\x08h\x07h\x02)\x81\x94}\x94(h\x05Nh\x06K\x04h\x07h\x02)\x81\x94}\x94(h\x05Nh\x06K\x02h\x07h\x02)\x81\x94}\x94(h\x05K\x84h\x06K\x01h\x07N\x8c\x05right\x94Nubh\x10h\x02)\x81\x94}\x94(h\x05K\'h\x06K\x01h\x07Nh\x10Nububh\x10h\x02)\x81\x94}\x94(h\x05\x99{\xb6,\xa0\x17\xffy\x9aS3\x0c\xc8r\xd8le\x04\x10\xd3L[S)U\xc3\x19\x8a\xdc\xb8{\x10\xc3\xa2\xa7\x96z\xa0}3\xb9S\x0fn\xf9F\x9dd\xd1\xcf\xa4Rpy\xb5p/\xeeq_Nh\x06K\x02h\x07h\x02)\x81\x94}\x94(h\x05K\xd2h\x06K\x01h\x07Nh\x10Nubh\x10h\x02)\x81\x94}\x94(h\x05Kah\x06K\x01h\x07Nh\x10Nubububh\x10h\x02)\x81\x94}\x94(h\x05Nh\x06K\x04h\x07h\x02)\x81\x94}\x94(h\x05Nh\x06K\x02h\x07h\x02)\x81\x94}\x94(h\x05K\xb8h\x06K\x01h\x07Nh\x10Nubh\x10h\x02)\x81\x94}\x94(h\x05K\xe5h\x06K\x01h\x07Nh\x10Nububh\x10h\x02)\x81\x94}\x94(h\x05Nh\x06K\x02h\x07h\x02)\x81\x94}\x94(h\x05K\xdah\x06K\x01h\x07Nh\x10Nubh\x10h3\x1b:\xd2g\xc1\x905\xa6\x9f9BX\xa0\xd7\xa0\x19+\x9bh\xcb\xb0w\xc9O\x06\xa0y\xf3\xaf(\x1c\xff\xefj\xcc\xdd\x03\xb3\xed)}\x82o\xbc\xba.\x8dJ\xd0q\xd4\x87]~\xf1\x16\xbb\x8f\xca\x02)\x81\x94}\x94(h\x05K7h\x06K\x01h\x07Nh\x10Nububububh\x10h\x02)\x81\x94}\x94(h\x05Nh\x06K\x08h\x07h\x02)\x81\x94}\x94(h\x05Nh\x06K\x04h\x07h\x02)\x81\x94}\x94(h\x05Nh\x06K\x02h\x07h\x02)\x81\x94}\x94(h\x05Krh\x06K\x01h\x07Nh\x10Nubh\x10h\x02)\x81\x94}\x94(h\x05KCh\x06K\x01h\x07Nh\x10Nububh\x10h\x02)\x81\x94}\x94(h\x05Nh\x06K\x02h\x07h\x02)\x81\x94}\x94(h\x05K\x81h\x06K\x01h\x07Nh\x10Nubh\x10h\x02)\x81\x94}\x94(h\x05K\x15h\x06K\x01\xef\x82\xa5\xf9\xc6I\xbb\xb5\xc0\x82\x14[\xc1{\xdd\xfb\x13\x92\xc9\xef\x9a1\x89\xca\xef\xbeiQ\xe8\xe9\x97"\xba\xc2\xf5\x01O0\xc7m\x05\xb6twg\xd9\xa5\x9a*>\x0c\x9f\xb5\xb7\x1c\xc3v;\x91>h\x07Nh\x10Nubububh\x10h\x02)\x81\x94}\x94(h\x05Nh\x06K\x04h\x07h\x02)\x81\x94}\x94(h\x05Nh\x06K\x02h\x07h\x02)\x81\x94}\x94(h\x05K\nh\x06K\x01h\x07Nh\x10Nubh\x10h\x02)\x81\x94}\x94(h\x05K5h\x06K\x01h\x07Nh\x10Nububh\x10h\x02)\x81\x94}\x94(h\x05Nh\x06K\x02h\x07h\x02)\x81\x94}\x94(h\x05Kvh\x06K\x01h\x07Nh\x10Nubh\x10h\x02)\x81\x94}\x94(h\x05K\x18h\x06K\x01h\x07Nh\x10Nububububub.;\xcfA\x13r\x1d\xbc\x1c\xc6c@=\x1cj\xee\x1f;\xa1r\ru\x19\xe0j\xf6\xe8\xc3UR\x8f\x11QL\x9cq\x84\xaf\xd0x\xfd""W\x05\xf4\xf2l\x89\xeb0\x1d\x1e\xd5\xeei\x02\xf8u\xf0)\x08\t\x1d\xe6\xa5L\xf8r\xb3' bytes (with ECC)
+Using 8192 coefficients (rows,cols >= 8) from 251503 available
+Using adaptive Q=5.0 for 1024 bytes payload (target PSNR >50dB)
+Extracting from 99608 coefficients (rows,cols >= 8)
+Using adaptive Q=7.0 for 12451 bytes extraction
+Traceback (most recent call last):
+  File "H:\LayerX Steganographic Security Framework\04. Compression Module\a4_compression.py", line 298, in parse_payload
+    pickle.loads(tree_bytes)
+_pickle.UnpicklingError: invalid load key, '\x99'.
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "H:\LayerX Steganographic Security Framework\final_comprehensive_test.py", line 55, in <module>
+    msg_len, tree_ext, compressed_ext = parse_payload(extracted)
+                                        ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "H:\LayerX Steganographic Security Framework\04. Compression Module\a4_compression.py", line 300, in parse_payload
+    raise ValueError("Tree ECC decoding failed with all codec strengths")
+ValueError: Tree ECC decoding failed with all codec strengths
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "H:\LayerX Steganographic Security Framework\final_comprehensive_test.py", line 68, in <module>
+    print(f"\u274c FAIL - {e}")
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\Lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>

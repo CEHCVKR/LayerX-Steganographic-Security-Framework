@@ -1,0 +1,11 @@
+Original message: 'Hello World! Testing optimization methods.'
+Payload size: 4031 bytes
+Using 32280 coefficients (rows,cols >= 8) from 251503 available
+Using adaptive Q=6.0 for 4035 bytes payload (target PSNR >50dB)
+Embedding: SUCCESS
+Extracting from 99608 coefficients (rows,cols >= 8)
+Using adaptive Q=7.0 for 12451 bytes extraction
+Extracted size: 4031 bytes
+Parsed: msg_len=48
+Decrypted message: 'Hello World! Testing optimization methods.'
+Match: True
